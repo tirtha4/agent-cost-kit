@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent Bill Calculator</title>
+<meta name="description" content="Estimate your AI agent's monthly API bill and what each of seven fixes saves. By @tirthaexe.">
+<style>
+:root{--ink:#111;--sub:#5d5a54;--line:#e4e1da;--bg:#fff;--soft:#f6f5f1;--hi:#FFD43B;--paid:#111;--cheap:#c9c4b8}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#f2f1ec;--sub:#a8a59c;--line:#2c2b28;--bg:#121211;--soft:#1b1a18;--paid:#f2f1ec;--cheap:#55524b}}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1040px;margin:0 auto;padding:28px 16px 60px} h1{font-size:clamp(28px,5vw,44px);line-height:1.05;margin:0 0 6px;letter-spacing:-.02em}
+h1 mark{background:linear-gradient(transparent 55%,var(--hi) 55%);color:inherit;padding:0 4px} .lede{color:var(--sub);margin:0 0 26px;max-width:640px}
+.grid{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:28px} @media (max-width:820px){.grid{grid-template-columns:1fr}.grid>div:last-child{order:-1}}
+section{border:1px solid var(--line);border-radius:16px;padding:18px} h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);margin:0 0 12px}
+label.row{display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:center;padding:6px 0;font-size:15px}
+input[type=number]{width:100%;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink);text-align:right}
+.fix{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)} .fix:first-of-type{border-top:0}
+.fix input[type=checkbox]{width:20px;height:20px;accent-color:#111} .fix b{display:block;font-size:15px} .fix small{color:var(--sub)} .fix .save{font-variant-numeric:tabular-nums;color:var(--sub);font-size:14px;white-space:nowrap}
+.big{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px} .big div{min-width:150px} .big .k{font-size:13px;color:var(--sub)}
+.big .v{font-size:clamp(30px,5vw,44px);font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums} .big .v.after{background:linear-gradient(transparent 60%,var(--hi) 60%)}
+.note{font-size:13px;color:var(--sub)} canvas{width:100%;height:220px;display:block;margin:10px 0 4px}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--sub)} .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+table{width:100%;border-collapse:collapse;font-size:14px} td{padding:7px 4px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums} td:last-child{text-align:right}
+.bar{height:8px;border-radius:4px;background:var(--ink);display:inline-block;vertical-align:middle;margin-right:8px}
+footer{margin-top:34px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;font-size:14px;color:var(--sub)} footer b{color:var(--ink);font-size:18px}
+details{margin-top:14px} summary{cursor:pointer;color:var(--sub);font-size:14px}
+</style></head><body><main>
+<h1>What does your agent <mark>really</mark> cost?</h1>
+<p class="lede">Every call re-sends the system prompt, the tool list and everything the agent has read so far. Set your numbers, switch on the fixes, and see the bill call by call.</p>
+<div class="grid">
+  <div>
+    <section><h2>Your agent</h2>
+      <label class="row">Runs per day <input type="number" id="runs" value="200" min="1"></label>
+      <label class="row">Tool calls per run <input type="number" id="tool_calls" value="19" min="1"></label>
+      <label class="row">Tokens per tool result <input type="number" id="result" value="4000" min="0"></label>
+      <label class="row">Tools sent each call <input type="number" id="tools" value="30" min="0"></label>
+      <label class="row">Tokens per tool definition <input type="number" id="tool_schema" value="500" min="0"></label>
+      <label class="row">System prompt tokens <input type="number" id="system" value="3000" min="0"></label>
+      <label class="row">Thinking tokens per call <input type="number" id="think" value="1500" min="0"></label>
+      <label class="row">Input $ / million tokens <input type="number" id="p_in" value="2" step="0.01" min="0"></label>
+      <label class="row">Output $ / million tokens <input type="number" id="p_out" value="10" step="0.01" min="0"></label>
+      <p class="note">Defaults: a 20-call coding run at Claude Sonnet 5.5 list prices. Check your provider's pricing page.</p>
+    </section>
+    <section style="margin-top:16px"><h2>The seven fixes</h2><div id="fixes"></div></section>
+  </div>
+  <div>
+    <section>
+      <div class="big"><div><div class="k">Per month, now</div><div class="v" id="before">$0</div></div>
+        <div><div class="k">With the fixes on</div><div class="v after" id="after">$0</div></div>
+        <div><div class="k">Saved</div><div class="v" id="saved">0%</div></div></div>
+      <div class="note" id="perrun"></div>
+      <canvas id="chart" aria-label="Cost of each call, before and after"></canvas>
+      <div class="legend"><span><i style="background:var(--cheap)"></i>each call now</span><span><i style="background:var(--paid)"></i>each call with the fixes</span></div>
+    </section>
+    <section style="margin-top:16px"><h2>Each fix on its own (ranked)</h2><table id="rank"></table>
+      <p class="note">Savings overlap, so they don't add up. Pruning edits old history, which breaks the cache from that point on; the model prunes in batches (every few calls) to keep most of the cache.</p></section>
+    <details><summary>How the estimate works</summary><p class="note">The run is priced call by call. Call N sends the system prompt, the tool definitions, the task and the text and results of calls 1 to N−1. A cached call pays 10% of the input price for the prefix it shares with the previous call, and 125% to write the rest. Thinking and visible output are billed as output. Parallel calls group independent reads (3 per call), stopping early skips 3 re-checks, filtering keeps 6 tools, trimming sends 1,000-token results, pruning keeps the last 3 results and summarises older ones in 150 tokens, and low effort thinks 400 tokens instead of 1,500. It's a model, not your invoice: use the kit's benchmark to measure your own agent.</p></details>
+  </div>
+</div>
+<footer><span>Made by <b>@tirthaexe</b> · part of the free AI Agent Cost Kit</span><span>Follow for more agent engineering</span></footer>
+</main>
+<script>
+const FIXES = [
+  ["cache", "Cache the prefix", "System prompt and tools first, marked once"],
+  ["trim", "Trim tool results", "grep, don't cat: ~1,000-token results"],
+  ["prune", "Prune old results", "Keep the last 3, summarise the rest"],
+  ["parallel", "Parallel tools", "Independent reads in one call"],
+  ["stop", "Stop on a check", "No re-checks after tests pass"],
+  ["tools", "Filter the tools", "Send 6, not all of them"],
+  ["effort", "Lower the effort", "400 thinking tokens, not 1,500"]];
+const $ = (id) => document.getElementById(id);
+$("fixes").innerHTML = FIXES.map(([k, t, s]) => `<label class="fix"><input type="checkbox" id="f_${k}" checked><span><b>${t}</b><small>${s}</small></span><span class="save" id="s_${k}"></span></label>`).join("");
+
+function simulate(p, on) {
+  const nTools = p.tool_calls - (on.stop ? Math.min(3, p.tool_calls - 1) : 0);
+  let groups = [];
+  if (on.parallel) {   // ~58% of the tool calls are independent reads (11 of 19 in the default run), sent 3 at a time
+    let par = Math.min(nTools, Math.round(p.tool_calls * 11 / 19)), left = nTools;
+    while (par > 0) { const g = Math.min(3, par); groups.push(g); par -= g; left -= g; }
+    while (left-- > 0) groups.push(1);
+  } else groups = Array(nTools).fill(1);
+  const calls = groups.length + 1;
+  const prefix = [["sys", p.system], ["tools", p.tool_schema * (on.tools ? Math.min(6, p.tools) : p.tools)], ["task", 1000]];
+  const hist = []; let prev = [], cost = 0, rid = 0; const per = [];
+  for (let c = 0; c < calls; c++) {
+    const ctx = prefix.concat(hist.map((h) => [h[0], h[1]]));
+    const ids = ctx.map((b) => b[0]), toks = ctx.map((b) => b[1]), total = toks.reduce((a, b) => a + b, 0);
+    let cin;
+    if (on.cache) { let common = 0; while (common < ids.length && common < prev.length && ids[common] === prev[common]) common++;
+      const read = toks.slice(0, common).reduce((a, b) => a + b, 0); cin = read * p.p_in * 0.1 + (total - read) * p.p_in * 1.25; }
+    else cin = total * p.p_in;
+    const out = 300 + (on.effort ? Math.min(400, p.think) : p.think);
+    const cc = (cin + out * p.p_out) / 1e6; cost += cc; per.push(cc); prev = ids;
+    if (c < calls - 1) {
+      hist.push([`call${c}`, 300, "text"]);
+      for (let g = 0; g < groups[c]; g++) hist.push([`r${rid++}`, on.trim ? Math.min(1000, p.result) : p.result, "result"]);
+      if (on.prune) { const full = hist.filter((h) => h[2] === "result"); if (full.length >= 6) for (const h of full.slice(0, -3)) { h[0] += "s"; h[1] = 150; h[2] = "summary"; } }
+    }
+  }
+  return { cost, calls, per };
+}
+const money = (x) => x >= 1000 ? "$" + Math.round(x).toLocaleString() : "$" + x.toFixed(x < 10 ? 2 : 0);
+function draw(a, b) {
+  const cv = $("chart"), dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d"); g.scale(dpr, dpr); g.clearRect(0, 0, W, H);
+  const css = getComputedStyle(document.documentElement), mx = Math.max(...a, ...b, 1e-9), n = Math.max(a.length, b.length), bw = (W - 8) / n;
+  const bar = (arr, col, inset) => { g.fillStyle = col; arr.forEach((v, i) => { const h = (v / mx) * (H - 10); g.fillRect(4 + i * bw + inset, H - h, Math.max(2, bw - 2 * inset - 2), h); }); };
+  bar(a, css.getPropertyValue("--cheap").trim(), 1); bar(b, css.getPropertyValue("--paid").trim(), bw * 0.28);
+}
+function update() {
+  const p = Object.fromEntries(["runs", "tool_calls", "result", "tools", "tool_schema", "system", "think", "p_in", "p_out"].map((k) => [k, Math.max(0, +$(k).value || 0)]));
+  p.tool_calls = Math.max(1, Math.round(p.tool_calls));
+  const on = Object.fromEntries(FIXES.map(([k]) => [k, $("f_" + k).checked])), off = Object.fromEntries(FIXES.map(([k]) => [k, false]));
+  const A = simulate(p, off), B = simulate(p, on), month = 30 * p.runs;
+  $("before").textContent = money(A.cost * month); $("after").textContent = money(B.cost * month);
+  $("saved").textContent = Math.round(100 * (1 - B.cost / A.cost)) + "%";
+  $("perrun").textContent = `Per run: ${money(A.cost)} over ${A.calls} calls → ${money(B.cost)} over ${B.calls} calls.`;
+  const alone = FIXES.map(([k, t]) => [t, 1 - simulate(p, { ...off, [k]: true }).cost / A.cost, k]).sort((x, y) => y[1] - x[1]);
+  alone.forEach(([, s, k]) => { $("s_" + k).textContent = "−" + Math.round(100 * s) + "% alone"; });
+  $("rank").innerHTML = alone.map(([t, s]) => `<tr><td>${t}</td><td><span class="bar" style="width:${Math.round(140 * s / Math.max(alone[0][1], 1e-9))}px"></span>−${Math.round(100 * s)}%</td></tr>`).join("");
+  draw(A.per, B.per);
+}
+document.querySelectorAll("input").forEach((el) => el.addEventListener("input", update)); window.addEventListener("resize", update); update();
+</script></body></html>

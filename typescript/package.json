@@ -1,0 +1,23 @@
+{
+  "name": "agent-cost-kit",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Seven ways to cut an AI agent's API bill without changing models (@tirthaexe)",
+  "scripts": {
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "example": "node --experimental-strip-types examples/agentLoop.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "*"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "author": "tirthaexe",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tirtha4/agent-cost-kit"
+  },
+  "private": true
+}
